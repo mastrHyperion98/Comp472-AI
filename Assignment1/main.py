@@ -5,7 +5,7 @@ import geopandas as gpd
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FormatStrFormatter
 import matplotlib.colors
-from functions import compute_crime_rate, generate_grid, assign_block_id
+from functions import  generate_grid, assign_block_id, compute_crime_rate
 
 step = 0.002
 # imports as a pandas dataframe
@@ -34,7 +34,5 @@ block_frame = generate_grid(step, min_x, max_x, min_y, max_y)
 block_id = assign_block_id(block_frame, crime_df)
 crime_df['block_id'] = block_id
 compute_crime_rate(block_frame, crime_df)
-
-
 # Now we want to define to create a dataframe that contains the crime rate for every element in our blocks
 

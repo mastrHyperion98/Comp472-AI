@@ -54,8 +54,9 @@ def assign_block_id(block_frame, crime_df):
 
 def compute_crime_rate(block_frame, crime_df):
     crime_count_per_block = pd.DataFrame(crime_df['block_id'].value_counts().reset_index())
-    crime_count_per_block.columns = ['block_id', 'count']
-    merged = pd.merge(block_frame, crime_count_per_block, on='block_id')
-    # crime_count_per_block.sort_values(by=['block_id'])
-    # print(crime_count_per_block.head())
-    print(merged.head())
+    crime_count_per_block.columns = ['block_id', 'crime_rate']
+    block_frame = pd.merge(block_frame, crime_count_per_block, on='block_id')
+
+
+def compute_threshold(block_frame):
+    
