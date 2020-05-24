@@ -35,7 +35,6 @@ def generate_grid(step, min_x, max_x, min_y, max_y):
     dataframe['upper_y'] = upper_y
     dataframe['block_id'] = block_id
     # then we can compute the crime_rate and add that to our block
-    print(dataframe)
     return dataframe
 
 

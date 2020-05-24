@@ -7,7 +7,7 @@ from matplotlib import colors
 from matplotlib.ticker import FormatStrFormatter
 from functions import compute_threshold,generate_grid, assign_block_id, compute_crime_rate, generate_map
 
-step = 0.0005
+step = 0.002
 # imports as a pandas dataframe
 crime_df = gpd.read_file('data/crime_dt.shp')
 points = crime_df.centroid
