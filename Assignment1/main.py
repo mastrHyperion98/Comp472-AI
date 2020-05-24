@@ -20,42 +20,29 @@ max_x = x_coords.max()
 min_y = y_coords.min()
 max_y = y_coords.max()
 # draw our map
-"""""
-map = crime_df.plot(color='yellow', marker="s")
-map.set_xticks(np.arange(min_x, max_x+0.002, 0.002))
-map.set_yticks(np.arange(min_y, max_y+0.002, 0.002))
-map.set_xticklabels(np.arange(min_x, max_x+0.002, 0.002),rotation=270)
-map.xaxis.set_major_formatter(FormatStrFormatter('%.3f'))
-map.yaxis.set_major_formatter(FormatStrFormatter('%.3f'))
-map.set_facecolor('xkcd:purple')
-plt.show()
-"""""
 block_frame = generate_grid(step, min_x, max_x, min_y, max_y)
 block_id = assign_block_id(block_frame, crime_df)
 crime_df['block_id'] = block_id
 block_frame = compute_crime_rate(block_frame, crime_df)
 # Sort by crime rate
 block_frame.sort_values(by='crime_rate', ascending=False, inplace=True)
-print(block_frame)
 _50th, _75th, _90th = compute_threshold(block_frame)
 # Read in the selected input
-#threshold = int(input("Select the threshold to use: 50, 75 or 90 (default is 50): "))
+threshold = int(input("Select the threshold to use: 50, 75 or 90 (default is 50): "))
 
-#if threshold != 75:
- #   if threshold != 90:
-  #      threshold = 50
+if threshold != 75:
+   if threshold != 90:
+        threshold = 50
 
-#print("Selected threshold: {}".format(threshold))
+print("Selected threshold: {}".format(threshold))
 
-generate_map(block_frame, 50, min_x, max_x, min_y, max_y)
-
-ncols = int((max_x-min_x)/step)
-nrows = int((max_y-min_y)/step)
+block_frame=generate_map(block_frame, threshold)
+block_frame.sort_values(by='block_id', ascending=True, inplace=True)
+ncols = int(round((max_x-min_x)/step,0))
+nrows = int(round((max_y-min_y)/step,0))
 # an array with linearly increasing values
-array = np.zeros(nrows*ncols)
+array = np.array(block_frame['danger'])
 array = array.reshape((nrows, ncols))
-array[0][10] = 1
-array[1][10] = 1
 fig, ax = plt.subplots()
 # axis format
 ax.xaxis.set_major_formatter(FormatStrFormatter('%.3f'))
@@ -65,10 +52,10 @@ extent=(min_x,max_x,min_y,max_y)
 # set imshow to our array of data
 ax.imshow(array, interpolation='nearest', extent=extent, origin='lower')
 # define ticks
-x_major_ticks = np.arange(min_x, max_x+0.002, 0.01)
-x_minor_ticks = np.arange(min_x, max_x+0.002, 0.002)
-y_major_ticks = (np.arange(min_y, max_y+0.002, 0.005))
-y_minor_ticks = (np.arange(min_y, max_y+0.002, 0.002))
+x_major_ticks = np.arange(min_x, max_x+step, 0.01)
+x_minor_ticks = np.arange(min_x, max_x+step, step)
+y_major_ticks = (np.arange(min_y, max_y+step, 0.005))
+y_minor_ticks = (np.arange(min_y, max_y+step, step))
 # set ticks
 ax.set_xticks(x_major_ticks)
 ax.set_xticks(x_minor_ticks, minor=True)

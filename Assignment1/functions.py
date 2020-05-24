@@ -8,25 +8,24 @@ from matplotlib.ticker import FormatStrFormatter
 def generate_grid(step, min_x, max_x, min_y, max_y):
     block_id = []
     id_counter = 0
-
     lower_x = []
     lower_y = []
     upper_x = []
     upper_y = []
 
     x = min_x
-    y = min_y - step
-    while x < max_x:
-        while y < max_y:
+    y = min_y
+    while y < max_y:
+        while x < max_x:
             lower_x.append(round(x, 3))
             lower_y.append(round(y, 3))
             upper_x.append(round(x + step, 3))
             upper_y.append(round(y + step, 3))
-            y = y + step
+            x = x + step
             block_id.append(id_counter)
             id_counter = id_counter + 1
-        x = x + step
-        y = min_y
+        y = y + step
+        x = min_x
 
     dataframe = pd.DataFrame(lower_x, columns=['lower_x'])
     dataframe['lower_y'] = lower_y
@@ -54,7 +53,12 @@ def assign_block_id(block_frame, crime_df):
 def compute_crime_rate(block_frame, crime_df):
     crime_count_per_block = pd.DataFrame(crime_df['block_id'].value_counts().reset_index())
     crime_count_per_block.columns = ['block_id', 'crime_rate']
-    return pd.merge(block_frame, crime_count_per_block, on='block_id')
+    df = pd.merge(block_frame, crime_count_per_block,how='left', on='block_id')
+    df['crime_rate'].fillna(0,inplace=True)
+    print(df)
+    return df
+
+
 
 
 def compute_threshold(sorted):
@@ -70,11 +74,11 @@ def compute_threshold(sorted):
     return _50th, _75th, _90th
 
 
-def generate_map(block_frame, threshold, min_x, max_x, min_y, max_y):
+def generate_map(block_frame, threshold):
     count = block_frame.shape[0]
     cutoff = 0
     if threshold == 50:
-        cutoff = int(count * 0.5)
+        cutoff = int(count * 0.50)
     elif threshold == 75:
         cutoff = int(count * 0.25)
     elif threshold == 90:
@@ -82,4 +86,14 @@ def generate_map(block_frame, threshold, min_x, max_x, min_y, max_y):
     else:
         cutoff = int(count * 0.5)
 
-    block_frame_2 = block_frame[:cutoff]
+    is_crime_high = pd.Series(np.zeros(count))
+    block_frame=block_frame.reset_index()
+
+    for index in range(cutoff):
+        is_crime_high[index] = 1
+
+    block_frame['danger'] = is_crime_high
+    return block_frame
+
+
+
