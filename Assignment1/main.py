@@ -7,7 +7,7 @@ from matplotlib import colors
 from matplotlib.ticker import FormatStrFormatter
 from functions import compute_threshold,generate_grid, assign_block_id, compute_crime_rate, generate_map
 
-step = 0.002
+step = 0.0005
 # imports as a pandas dataframe
 crime_df = gpd.read_file('data/crime_dt.shp')
 points = crime_df.centroid
@@ -22,6 +22,7 @@ max_y = y_coords.max()
 # draw our map
 block_frame = generate_grid(step, min_x, max_x, min_y, max_y)
 block_id = assign_block_id(block_frame, crime_df)
+
 crime_df['block_id'] = block_id
 block_frame = compute_crime_rate(block_frame, crime_df)
 # Sort by crime rate
@@ -38,8 +39,8 @@ print("Selected threshold: {}".format(threshold))
 
 block_frame=generate_map(block_frame, threshold)
 block_frame.sort_values(by='block_id', ascending=True, inplace=True)
-ncols = int(round((max_x-min_x)/step,0))
-nrows = int(round((max_y-min_y)/step,0))
+ncols = int(round((max_x+step-min_x)/step,0))
+nrows = int(round((max_y+step-min_y)/step,0))
 # an array with linearly increasing values
 array = np.array(block_frame['danger'])
 array = array.reshape((nrows, ncols))
