@@ -3,9 +3,9 @@ import numpy as np
 import pandas as pd
 import geopandas as gpd
 import matplotlib.pyplot as plt
+from matplotlib import colors
 from matplotlib.ticker import FormatStrFormatter
-import matplotlib.colors
-from functions import compute_threshold,generate_grid, assign_block_id, compute_crime_rate
+from functions import compute_threshold,generate_grid, assign_block_id, compute_crime_rate, generate_map
 
 step = 0.002
 # imports as a pandas dataframe
@@ -34,6 +34,44 @@ block_frame = generate_grid(step, min_x, max_x, min_y, max_y)
 block_id = assign_block_id(block_frame, crime_df)
 crime_df['block_id'] = block_id
 block_frame = compute_crime_rate(block_frame, crime_df)
-compute_threshold(block_frame)
-# Now we want to define to create a dataframe that contains the crime rate for every element in our blocks
+# Sort by crime rate
+block_frame.sort_values(by='crime_rate', ascending=False, inplace=True)
+print(block_frame)
+_50th, _75th, _90th = compute_threshold(block_frame)
+# Read in the selected input
+#threshold = int(input("Select the threshold to use: 50, 75 or 90 (default is 50): "))
 
+#if threshold != 75:
+ #   if threshold != 90:
+  #      threshold = 50
+
+#print("Selected threshold: {}".format(threshold))
+
+generate_map(block_frame, 50, min_x, max_x, min_y, max_y)
+
+ncols = int((max_x-min_x)/step)
+nrows = int((max_y-min_y)/step)
+# an array with linearly increasing values
+array = np.zeros(nrows*ncols)
+array = array.reshape((nrows, ncols))
+array[0][10] = 1
+array[1][10] = 1
+fig, ax = plt.subplots()
+# axis format
+ax.xaxis.set_major_formatter(FormatStrFormatter('%.3f'))
+ax.yaxis.set_major_formatter(FormatStrFormatter('%.3f'))
+# define extend
+extent=(min_x,max_x,min_y,max_y)
+# set imshow to our array of data
+ax.imshow(array, interpolation='nearest', extent=extent, origin='lower')
+# define ticks
+x_major_ticks = np.arange(min_x, max_x+0.002, 0.01)
+x_minor_ticks = np.arange(min_x, max_x+0.002, 0.002)
+y_major_ticks = (np.arange(min_y, max_y+0.002, 0.005))
+y_minor_ticks = (np.arange(min_y, max_y+0.002, 0.002))
+# set ticks
+ax.set_xticks(x_major_ticks)
+ax.set_xticks(x_minor_ticks, minor=True)
+ax.set_yticks(y_major_ticks)
+ax.set_yticks(y_minor_ticks, minor=True)
+plt.show()
