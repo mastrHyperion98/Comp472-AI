@@ -5,7 +5,7 @@ import geopandas as gpd
 import matplotlib.pyplot as plt
 from matplotlib import colors
 from matplotlib.ticker import FormatStrFormatter
-from functions import compute_threshold,generate_grid, assign_block_id, compute_crime_rate, generate_map
+from functions import compute_threshold, generate_grid, assign_block_id, compute_crime_rate, generate_map
 
 step = 0.004
 # imports as a pandas dataframe
@@ -32,10 +32,10 @@ threshold = int(input("Select the threshold to use: "))
 
 print("Selected threshold: {}".format(threshold))
 
-block_frame=generate_map(block_frame, threshold)
+block_frame = generate_map(block_frame, threshold)
 block_frame.sort_values(by='block_id', ascending=True, inplace=True)
-ncols = int(round((max_x-min_x)/step,0))
-nrows = int(round((max_y-min_y)/step,0))
+ncols = int(round((max_x - min_x) / step, 0))
+nrows = int(round((max_y - min_y) / step, 0))
 # an array with linearly increasing values
 array = np.array(block_frame['danger'])
 array = array.reshape((nrows, ncols))
@@ -44,14 +44,14 @@ fig, ax = plt.subplots()
 ax.xaxis.set_major_formatter(FormatStrFormatter('%.3f'))
 ax.yaxis.set_major_formatter(FormatStrFormatter('%.3f'))
 # define extend
-extent=(min_x,max_x,min_y,max_y)
+extent = (min_x, max_x, min_y, max_y)
 # set imshow to our array of data
 ax.imshow(array, interpolation='nearest', extent=extent, origin='lower')
 # define ticks
-x_major_ticks = np.arange(min_x, max_x+step, 0.01)
-x_minor_ticks = np.arange(min_x, max_x+step, step)
-y_major_ticks = (np.arange(min_y, max_y+step, 0.005))
-y_minor_ticks = (np.arange(min_y, max_y+step, step))
+x_major_ticks = np.arange(min_x, max_x + step, 0.01)
+x_minor_ticks = np.arange(min_x, max_x + step, step)
+y_major_ticks = (np.arange(min_y, max_y + step, 0.005))
+y_minor_ticks = (np.arange(min_y, max_y + step, step))
 # set ticks
 ax.set_xticks(x_major_ticks)
 ax.set_xticks(x_minor_ticks, minor=True)
@@ -68,8 +68,6 @@ subset = block_frame[['upper_x', 'lower_y']]
 lower_right = [tuple(x) for x in subset.to_numpy()]
 subset = block_frame[['upper_x', 'upper_y']]
 top_right = [tuple(x) for x in subset.to_numpy()]
-
-print(lower_left)
-print(top_left)
-print(lower_right)
-print(top_right)
+# Get our unique list of positions
+positions = np.unique(np.concatenate((lower_right, lower_left, top_left, top_right)),axis=0)
+print(positions)
