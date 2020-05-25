@@ -13,8 +13,8 @@ def generate_grid(step, min_x, max_x, min_y, max_y):
     upper_x = []
     upper_y = []
 
-    ncols = int(round((max_x+step - min_x) / step, 0))
-    nrows = int(round((max_y+step - min_y) / step, 0))
+    ncols = int(round((max_x - min_x) / step, 0))
+    nrows = int(round((max_y - min_y) / step, 0))
 
     y = min_y - step
     for j in range(nrows):
@@ -66,6 +66,7 @@ def compute_threshold(sorted):
     _50th = sorted['crime_rate'].quantile(.5)
     _75th = sorted['crime_rate'].quantile(.75)
     _90th = sorted['crime_rate'].quantile(.90)
+    sum = sorted['crime_rate'].sum()
     print("Crime Rate mean: {}".format(sorted['crime_rate'].mean()))
     print("Crime Rate median: {}".format(sorted['crime_rate'].median()))
     print("Crime Rate standard deviation: {}".format(sorted['crime_rate'].std()))
@@ -74,19 +75,10 @@ def compute_threshold(sorted):
     print('90th quartile: {}'.format(_90th))
     return _50th, _75th, _90th
 
-
+# generate danger index
 def generate_map(block_frame, threshold):
     count = block_frame.shape[0]
-    cutoff = 0
-    if threshold == 50:
-        cutoff = int(count * 0.50)
-    elif threshold == 75:
-        cutoff = int(count * 0.25)
-    elif threshold == 90:
-        cutoff = int(count * 0.10)
-    else:
-        cutoff = int(count * 0.5)
-
+    cutoff = int(count * (threshold/100.0))
     is_crime_high = pd.Series(np.zeros(count))
     block_frame=block_frame.reset_index()
 
