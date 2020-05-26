@@ -5,9 +5,12 @@ import geopandas as gpd
 import matplotlib.pyplot as plt
 from matplotlib import colors
 from matplotlib.ticker import FormatStrFormatter
-from functions import compute_threshold, generate_grid, assign_block_id, compute_crime_rate, generate_map
+from scipy.spatial import KDTree
+from node import Node
+from functions import compute_threshold, generate_grid, assign_block_id, compute_crime_rate, generate_map, \
+    position_id_dict, normalize_position
 
-step = 0.004
+step = 0.002
 # imports as a pandas dataframe
 crime_df = gpd.read_file('data/crime_dt.shp')
 points = crime_df.centroid
@@ -31,7 +34,6 @@ _50th, _75th, _90th = compute_threshold(block_frame)
 threshold = int(input("Select the threshold to use: "))
 
 print("Selected threshold: {}".format(threshold))
-
 block_frame = generate_map(block_frame, threshold)
 block_frame.sort_values(by='block_id', ascending=True, inplace=True)
 ncols = int(round((max_x - min_x) / step, 0))
@@ -57,17 +59,21 @@ ax.set_xticks(x_major_ticks)
 ax.set_xticks(x_minor_ticks, minor=True)
 ax.set_yticks(y_major_ticks)
 ax.set_yticks(y_minor_ticks, minor=True)
+plt.grid(which='minor')
 plt.show()
 
-# Next we need to create a list of all coordinates using tuples for the Tree
-subset = block_frame[['lower_x', 'lower_y']]
-lower_left = [tuple(x) for x in subset.to_numpy()]
-subset = block_frame[['lower_x', 'upper_y']]
-top_left = [tuple(x) for x in subset.to_numpy()]
-subset = block_frame[['upper_x', 'lower_y']]
-lower_right = [tuple(x) for x in subset.to_numpy()]
-subset = block_frame[['upper_x', 'upper_y']]
-top_right = [tuple(x) for x in subset.to_numpy()]
-# Get our unique list of positions
-positions = np.unique(np.concatenate((lower_right, lower_left, top_left, top_right)),axis=0)
-print(positions)
+# We need to get our start Node and Goal Node
+# (-73.59, 45.49), , ), (-73.59, 45.53)
+invalid_input = True
+while invalid_input:
+    start_pos = tuple(float(x.strip()) for x in input('Enter the starting position(ex: -73.589, 45.490) : ').split(','))
+    if(-73.59 <= start_pos[0] <= -73.55
+            and 45.53 >= start_pos[1] >= 45.49):
+        #normalize position to lower left if not an edge
+        start_pos=normalize_position(block_frame, start_pos[0], start_pos[1])
+        invalid_input = False
+    else:
+        print('Invalid input! Try again!')
+
+print(start_pos)
+map = position_id_dict(block_frame,step)
