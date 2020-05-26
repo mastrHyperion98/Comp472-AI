@@ -8,7 +8,7 @@ from matplotlib.ticker import FormatStrFormatter
 from scipy.spatial import KDTree
 from node import Node
 from functions import compute_threshold, generate_grid, assign_block_id, compute_crime_rate, generate_map, \
-    position_id_dict, normalize_position
+    position_id_dict, normalize_position, prompt_position
 
 step = 0.002
 # imports as a pandas dataframe
@@ -33,14 +33,16 @@ _50th, _75th, _90th = compute_threshold(block_frame)
 # Read in the selected input
 threshold = int(input("Select the threshold to use: "))
 
+print('\n****Runtime_Configuration*****\n')
 print("Selected threshold: {}".format(threshold))
 block_frame = generate_map(block_frame, threshold)
 block_frame.sort_values(by='block_id', ascending=True, inplace=True)
 ncols = int(round((max_x - min_x) / step, 0))
 nrows = int(round((max_y - min_y) / step, 0))
+
 # an array with linearly increasing values
-array = np.array(block_frame['danger'])
-array = array.reshape((nrows, ncols))
+obstacle = np.array(block_frame['danger'])
+array = obstacle.reshape((nrows, ncols))
 fig, ax = plt.subplots()
 # axis format
 ax.xaxis.set_major_formatter(FormatStrFormatter('%.3f'))
@@ -64,16 +66,9 @@ plt.show()
 
 # We need to get our start Node and Goal Node
 # (-73.59, 45.49), , ), (-73.59, 45.53)
-invalid_input = True
-while invalid_input:
-    start_pos = tuple(float(x.strip()) for x in input('Enter the starting position(ex: -73.589, 45.490) : ').split(','))
-    if(-73.59 <= start_pos[0] <= -73.55
-            and 45.53 >= start_pos[1] >= 45.49):
-        #normalize position to lower left if not an edge
-        start_pos=normalize_position(block_frame, start_pos[0], start_pos[1])
-        invalid_input = False
-    else:
-        print('Invalid input! Try again!')
-
-print(start_pos)
+start_pos = prompt_position(block_frame)
+print('The start position is:{}'.format(start_pos))
+goal_pos = prompt_position(block_frame)
+print('The goal position is: {}'.format(goal_pos))
+# create a map of points and block index --> to look up in the obstacle grid
 map = position_id_dict(block_frame,step)

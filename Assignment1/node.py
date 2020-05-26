@@ -13,7 +13,7 @@ class Node:
     def __eq__(self, other):
         return self.position == other.position
 
-    # Sort nodes
+    # Sort nodes by cost
     def __lt__(self, other):
          return self.f < other.f
 

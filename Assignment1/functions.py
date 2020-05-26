@@ -3,7 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib import colors
 from matplotlib.ticker import FormatStrFormatter
-
+from node import Node
 
 # This function creates a data frame that is composed of all the blocks defined by our stepping function and its
 # respective id
@@ -79,7 +79,7 @@ def compute_threshold(sorted):
 # generate danger index
 def generate_map(block_frame, threshold):
     count = block_frame.shape[0]
-    cutoff = int(count * (threshold / 100.0))
+    cutoff = int(count * (1-(threshold / 100.0)))
     is_crime_high = pd.Series(np.zeros(count))
     block_frame = block_frame.reset_index()
 
@@ -125,3 +125,102 @@ def normalize_position(block_frame, x, y):
     return (x,y)
 
 
+def prompt_position(block_frame):
+    invalid_input = True
+    while invalid_input:
+        start_pos = tuple(
+            float(x.strip()) for x in input('Enter a position(ex: -73.589, 45.490) : ').split(','))
+        if (-73.59 <= start_pos[0] <= -73.55
+                and 45.53 >= start_pos[1] >= 45.49):
+            # normalize position to lower left if not an edge
+            start_pos = normalize_position(block_frame, start_pos[0], start_pos[1])
+            invalid_input = False
+        else:
+            print('Invalid input! Try again!')
+    return start_pos
+
+
+def astar_search(map, obstacles, start, end, step):
+    # Create lists for open nodes and closed nodes
+    open = []
+    closed = []
+
+    # We need to create our start and goal node
+    start_node = Node(start, None)
+    goal_node = Node(end, None)
+
+    # We want to add our start/root node to the list of open nodes
+    open.append(start_node)
+
+    # We need to loop through our list until all open nodes are closed
+    while len(open) > 0:
+
+        # Sort the open list to get the node with the lowest cost first
+        # Our nodes are sorted by their cost and we want to find the lowest cost path to reach the goal
+        open.sort()
+
+        # We want to get the first element in the list. The node with the lowest cost
+        current_node = open.pop(0)
+
+        # Add the current node to the closed list
+        # Since we are visiting it
+        closed.append(current_node)
+
+        # Check if we have reached the goal, return the path
+        if current_node == goal_node:
+            path = []
+            while current_node != start_node:
+                path.append(current_node.position)
+                current_node = current_node.parent
+            # path.append(start)
+            # Return reversed path
+            return path[::-1]
+
+        # unzip the position tuple
+        (x, y) = current_node.position
+
+        # Get neighbors
+        # These are the connecting nodes. We also have access to diagonals.
+        neighbors = [(x - step, y), (x - step, y - step), (x, y - step), (x+step, y -step ),(x+step,y),
+                     (x+step,y+step), (x,y+step), (x-step, y+step)]
+
+        # Neighbours denote all the available positions to which we can move. They will be checked for validity below
+
+        # Loop neighbors and check validation conditions and assign weight
+        for next in neighbors:
+
+            # Get value from map
+            map_value = map.get(next)
+
+            # Check if the node is a wall
+            if (map_value == '#'):
+                continue
+
+            # Create a neighbor node
+            neighbor = Node(next, current_node)
+
+            # Check if the neighbor is in the closed list
+            if (neighbor in closed):
+                continue
+
+            # Generate heuristics (Manhattan distance) -- move to seperate function
+            neighbor.g = abs(neighbor.position[0] - start_node.position[0]) + abs(
+                neighbor.position[1] - start_node.position[1]) # switch to recursive sum of g's
+            neighbor.h = abs(neighbor.position[0] - goal_node.position[0]) + abs(
+                neighbor.position[1] - goal_node.position[1])
+            neighbor.f = neighbor.g + neighbor.h
+
+            # Check if neighbor is in open list and if it has a lower f value
+            if add_to_open(open, neighbor) == True:
+                # Everything is green, add neighbor to open list
+                open.append(neighbor)
+
+    # Return None, no path is found
+    return None
+
+
+def add_to_open(open, neighbor):
+    for node in open:
+        if neighbor == node and neighbor.f >= node.f:
+            return False
+    return True
