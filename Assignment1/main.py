@@ -68,10 +68,11 @@ ax.yaxis.set_major_formatter(FormatStrFormatter('%.3f'))
 extent = (min_x, max_x, min_y, max_y)
 # set imshow to our array of data
 # loop through path
-for i in range(len(path) - 1):
-    (x1, y1) = path[i]
-    (x2, y2) = path[i+1]
-    ax.plot([x1, x2], [y1, y2], 'r')
+if path is not None:
+    for i in range(len(path) - 1):
+        (x1, y1) = path[i]
+        (x2, y2) = path[i+1]
+        ax.plot([x1, x2], [y1, y2], 'r')
 
 ax.imshow(array, interpolation='nearest', extent=extent, origin='lower')
 # define ticks
