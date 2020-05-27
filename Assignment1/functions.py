@@ -5,6 +5,7 @@ from matplotlib import colors
 from matplotlib.ticker import FormatStrFormatter
 from node import Node
 
+
 # This function creates a data frame that is composed of all the blocks defined by our stepping function and its
 # respective id
 def generate_grid(step, min_x, max_x, min_y, max_y):
@@ -79,7 +80,7 @@ def compute_threshold(sorted):
 # generate danger index
 def generate_map(block_frame, threshold):
     count = block_frame.shape[0]
-    cutoff = int(count * (1-(threshold / 100.0)))
+    cutoff = int(count * (1 - (threshold / 100.0)))
     is_crime_high = pd.Series(np.zeros(count))
     block_frame = block_frame.reset_index()
 
@@ -122,7 +123,7 @@ def normalize_position(block_frame, x, y):
     if len(frame) > 0:
         x = frame.lower_x.iloc[0]
         y = frame.lower_y.iloc[0]
-    return (x,y)
+    return (x, y)
 
 
 def prompt_position(block_frame):
@@ -174,6 +175,7 @@ def astar_search(map, obstacles, start, end, step):
                 current_node = current_node.parent
             # path.append(start)
             # Return reversed path
+            path.append(start_node.position)
             return path[::-1]
 
         # unzip the position tuple
@@ -181,37 +183,71 @@ def astar_search(map, obstacles, start, end, step):
 
         # Get neighbors
         # These are the connecting nodes. We also have access to diagonals.
-        neighbors = [(x - step, y), (x - step, y - step), (x, y - step), (x+step, y -step ),(x+step,y),
-                     (x+step,y+step), (x,y+step), (x-step, y+step)]
+        neighbors = [(round(x - step, 3), y), (round(x - step, 3), round(y - step, 3)), (x, round(y - step, 3))
+            , (round(x + step, 3), round(y - step, 3)), (round(x + step, 3), y),
+                     (round(x + step, 3), round(y + step, 3)), (x, round(y + step, 3)),
+                     (round(x - step, 3), round(y + step, 3))]
 
         # Neighbours denote all the available positions to which we can move. They will be checked for validity below
 
         # Loop neighbors and check validation conditions and assign weight
         for next in neighbors:
 
-            # Get value from map
-            map_value = map.get(next)
-
-            # Check if the node is a wall
-            if (map_value == '#'):
+            # If the position is out of bounds skip it -- invalid position
+            # Condition 1
+            if next not in map:
                 continue
 
+            # Condition 2: Position not on boundary... namely  -73.590 < x < -73.550
+            # 45.490 < x < 45.530
+            # if True skip boundary position
+            if -73.590 == next[0] or -73.550 == next[0] or 45.490 == next[1] or 45.530 == next[1]:
+                if next != goal_node.position:
+                    continue
+
+            # If position passes condition 1 and 2 then fetch list of block_id per position
+            id_list = map[next]
             # Create a neighbor node
             neighbor = Node(next, current_node)
-
+            node_cost = 0
             # Check if the neighbor is in the closed list
-            if (neighbor in closed):
+            if neighbor in closed:
                 continue
-
+            # Condition 3: Is next move a diagonal
+            # Is a diagonal if the list intersection length is 1
+            ids_current = set(map[current_node.position])
+            id_common = list(ids_current.intersection(id_list))
+            if len(id_common) == 1:
+                print('diagonal')
+                id_neigh = id_common[0]
+                # id is a block cannot move diagonally across
+                if obstacles[int(id_neigh)] == 1:
+                    print('invalid obstacle')
+                    continue
+                else:
+                    node_cost = 1.5
+            # if not diagonal than do following
+            else:
+                # Condition 4: Evaluate if the path taken touches a block area
+                # Essentially the edge is the two blocks that the points shares with the other edge
+                num_obstacles = 0
+                for id in id_common:
+                    if obstacles[int(id)] == 1:
+                        num_obstacles = num_obstacles + 1
+                # if both are obstacles we cannot traverse
+                if num_obstacles == 2:
+                    continue
+                elif num_obstacles == 1:
+                    node_cost = 1.3
+                else:
+                    node_cost = 1
             # Generate heuristics (Manhattan distance) -- move to seperate function
-            neighbor.g = abs(neighbor.position[0] - start_node.position[0]) + abs(
-                neighbor.position[1] - start_node.position[1]) # switch to recursive sum of g's
+            neighbor.g = neighbor.parent.g + node_cost
             neighbor.h = abs(neighbor.position[0] - goal_node.position[0]) + abs(
                 neighbor.position[1] - goal_node.position[1])
             neighbor.f = neighbor.g + neighbor.h
-
             # Check if neighbor is in open list and if it has a lower f value
-            if add_to_open(open, neighbor) == True:
+            if add_to_open(open, neighbor):
                 # Everything is green, add neighbor to open list
                 open.append(neighbor)
 
@@ -224,3 +260,13 @@ def add_to_open(open, neighbor):
         if neighbor == node and neighbor.f >= node.f:
             return False
     return True
+
+
+'''''
+Test Start and Goal
+-73.590,45.490
+-73.550,45.530
+
+-73.578, 45.508
+-73.576, 45.51
+'''''

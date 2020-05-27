@@ -8,7 +8,7 @@ from matplotlib.ticker import FormatStrFormatter
 from scipy.spatial import KDTree
 from node import Node
 from functions import compute_threshold, generate_grid, assign_block_id, compute_crime_rate, generate_map, \
-    position_id_dict, normalize_position, prompt_position
+    position_id_dict, normalize_position, prompt_position, astar_search
 
 step = 0.002
 # imports as a pandas dataframe
@@ -41,8 +41,26 @@ ncols = int(round((max_x - min_x) / step, 0))
 nrows = int(round((max_y - min_y) / step, 0))
 
 # an array with linearly increasing values
-obstacle = np.array(block_frame['danger'])
-array = obstacle.reshape((nrows, ncols))
+obstacles = np.array(block_frame['danger'])
+array = obstacles.reshape((nrows, ncols))
+# We need to get our start Node and Goal Node
+# (-73.59, 45.49), , ), (-73.59, 45.53)
+start_pos = prompt_position(block_frame)
+print('The start position is:{}'.format(start_pos))
+goal_pos = prompt_position(block_frame)
+print('The goal position is: {}'.format(goal_pos))
+# create a map of points and block index --> to look up in the obstacle grid
+map = position_id_dict(block_frame,step)
+
+obstacles = obstacles.tolist()
+print('STARTING SEARCH')
+path = astar_search(map, obstacles, start_pos, goal_pos, step)
+print('SEARCH OVER!')
+print(path)
+
+
+
+# DRAW GRAPH
 fig, ax = plt.subplots()
 # axis format
 ax.xaxis.set_major_formatter(FormatStrFormatter('%.3f'))
@@ -50,6 +68,12 @@ ax.yaxis.set_major_formatter(FormatStrFormatter('%.3f'))
 # define extend
 extent = (min_x, max_x, min_y, max_y)
 # set imshow to our array of data
+# loop through path
+for i in range(len(path) - 1):
+    (x1, y1) = path[i]
+    (x2, y2) = path[i+1]
+    ax.plot([x1, x2], [y1, y2], 'r')
+
 ax.imshow(array, interpolation='nearest', extent=extent, origin='lower')
 # define ticks
 x_major_ticks = np.arange(min_x, max_x + step, 0.01)
@@ -63,12 +87,3 @@ ax.set_yticks(y_major_ticks)
 ax.set_yticks(y_minor_ticks, minor=True)
 plt.grid(which='minor')
 plt.show()
-
-# We need to get our start Node and Goal Node
-# (-73.59, 45.49), , ), (-73.59, 45.53)
-start_pos = prompt_position(block_frame)
-print('The start position is:{}'.format(start_pos))
-goal_pos = prompt_position(block_frame)
-print('The goal position is: {}'.format(goal_pos))
-# create a map of points and block index --> to look up in the obstacle grid
-map = position_id_dict(block_frame,step)
