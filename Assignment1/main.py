@@ -51,7 +51,6 @@ goal_pos = prompt_position(block_frame)
 print('The goal position is: {}'.format(goal_pos))
 # create a map of points and block index --> to look up in the obstacle grid
 map = position_id_dict(block_frame,step)
-
 obstacles = obstacles.tolist()
 print('STARTING SEARCH')
 path = astar_search(map, obstacles, start_pos, goal_pos, step)

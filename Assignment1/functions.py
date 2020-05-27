@@ -99,19 +99,14 @@ def position_id_dict(block_frame, step):
         upper_x = block['upper_x']
         upper_y = block['upper_y']
         id = block['block_id']
-        # list of x elements
-        x = np.arange(low_x, upper_x, step)
-        # list of y elements
-        y = np.arange(low_y, upper_y, step)
 
-        for _x in x:
-            for _y in y:
-                position = (round(_x, 3), round(_y, 3))
-                # check if position in dic
-                if position in dict:
-                    dict[position].append(id)
-                else:
-                    dict[position] = [id]
+        positions = [(low_x,low_y),(low_x,upper_y),(upper_x,low_y),(upper_x,upper_y)]
+        for position in positions:
+            # check if position in dic
+            if position in dict:
+                dict[position].append(id)
+            else:
+                dict[position] = [id]
         # should return a dictionary list of all valid positions and its block id --> we talking several thousands points
     return dict
 
