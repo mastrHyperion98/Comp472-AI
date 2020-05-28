@@ -1,9 +1,41 @@
+# -------------------------------------------------------
+# Assignment 1
+# Written by Steven Smith 40057065
+# For COMP 472 Section KX - Summer 2020
+# -------------------------------------------------------
+
+# This file contains functions and classes necessary to the computation of the
+# data and search
+
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-from matplotlib import colors
-from matplotlib.ticker import FormatStrFormatter
-from node import Node
+from math import ceil
+import time
+# Node class for our Tree
+# This class represents a node for our list
+
+
+class Node:
+    def __init__(self, position:(), parent:()):
+        #position is a tuple
+        self.position = position
+        #parent is another node
+        self.parent = parent
+        self.g = 0 # Distance to start node
+        self.h = 0 # heuristic cost
+        self.f = 0 # Total cost
+
+    # Compare nodes
+    def __eq__(self, other):
+        return self.position == other.position
+
+    # Sort nodes by cost
+    def __lt__(self, other):
+         return self.f < other.f
+
+    # Print node
+    def __repr__(self):
+        return '({0},{1})'.format(self.position, self.f)
 
 
 # This function creates a data frame that is composed of all the blocks defined by our stepping function and its
@@ -16,8 +48,8 @@ def generate_grid(step, min_x, max_x, min_y, max_y):
     upper_x = []
     upper_y = []
 
-    ncols = int(round((max_x - min_x) / step, 0))
-    nrows = int(round((max_y - min_y) / step, 0))
+    ncols = ceil((max_x - min_x) / step)
+    nrows = ceil((max_y - min_y) / step)
 
     y = min_y - step
     for j in range(nrows):
@@ -63,7 +95,7 @@ def compute_crime_rate(block_frame, crime_df):
     return df
 
 
-def compute_threshold(sorted):
+def description(sorted):
     _50th = sorted['crime_rate'].quantile(.5)
     _75th = sorted['crime_rate'].quantile(.75)
     _90th = sorted['crime_rate'].quantile(.90)
@@ -74,17 +106,17 @@ def compute_threshold(sorted):
     print('50th quartile: {}'.format(_50th))
     print('75th quartile: {}'.format(_75th))
     print('90th quartile: {}'.format(_90th))
-    return _50th, _75th, _90th
-
+    print('\n**** Dataframe content ****\n')
 
 # generate danger index
 def generate_map(block_frame, threshold):
     count = block_frame.shape[0]
-    cutoff = int(count * (1 - (threshold / 100.0)))
+    cutoff = block_frame['crime_rate'].quantile(threshold/100.0)
     is_crime_high = pd.Series(np.zeros(count))
     block_frame = block_frame.reset_index()
-
-    for index in range(cutoff):
+    sub_frame = block_frame[(block_frame.crime_rate >= cutoff)]
+    # i will have to modify that to include duplicates
+    for index in range(len(sub_frame)):
         is_crime_high[index] = 1
 
     block_frame['danger'] = is_crime_high
@@ -121,11 +153,13 @@ def normalize_position(block_frame, x, y):
     return (x, y)
 
 
-def prompt_position(block_frame):
+def prompt_position(block_frame, start):
     invalid_input = True
     while invalid_input:
+        if start: message = 'start'
+        else: message = 'goal'
         start_pos = tuple(
-            float(x.strip()) for x in input('Enter a position(ex: -73.589, 45.490) : ').split(','))
+            float(x.strip()) for x in input('Enter a {} position(ex: -73.589, 45.490) : '.format(message)).split(','))
         if (-73.59 <= start_pos[0] <= -73.55
                 and 45.53 >= start_pos[1] >= 45.49):
             # normalize position to lower left if not an edge
@@ -136,7 +170,7 @@ def prompt_position(block_frame):
     return start_pos
 
 
-def astar_search(map, obstacles, start, end, step):
+def astar_search(position_map, obstacles, start, end, step):
     # Create lists for open nodes and closed nodes
     open = []
     closed = []
@@ -147,9 +181,13 @@ def astar_search(map, obstacles, start, end, step):
 
     # We want to add our start/root node to the list of open nodes
     open.append(start_node)
-
+    start_time = time.process_time()
     # We need to loop through our list until all open nodes are closed
     while len(open) > 0:
+
+        if time.process_time() - start_time >= 10:
+            print('Time is up. The optimal path is not found.')
+            return None
 
         # Sort the open list to get the node with the lowest cost first
         # Our nodes are sorted by their cost and we want to find the lowest cost path to reach the goal
@@ -170,6 +208,11 @@ def astar_search(map, obstacles, start, end, step):
                 current_node = current_node.parent
             # path.append(start)
             # Return reversed path
+            if not path:
+                message = '“Due to blocks, no path is found. Please change the map and try again”'
+                print(message)
+                return None
+            print('Time Required for search: {}'.format(time.process_time() - start_time))
             path.append(start_node.position)
             return path[::-1]
 
@@ -190,7 +233,7 @@ def astar_search(map, obstacles, start, end, step):
 
             # If the position is out of bounds skip it -- invalid position
             # Condition 1
-            if next not in map:
+            if next not in position_map:
                 continue
 
             # Condition 2: Position not on boundary... namely  -73.590 < x < -73.550
@@ -200,8 +243,8 @@ def astar_search(map, obstacles, start, end, step):
                 if next != goal_node.position:
                     continue
 
-            # If position passes condition 1 and 2 then fetch list of block_id per position
-            id_list = map[next]
+            # list of block indices for our position
+            id_list = position_map[next]
             # Create a neighbor node
             neighbor = Node(next, current_node)
             node_cost = 0
@@ -210,14 +253,12 @@ def astar_search(map, obstacles, start, end, step):
                 continue
             # Condition 3: Is next move a diagonal
             # Is a diagonal if the list intersection length is 1
-            ids_current = set(map[current_node.position])
+            ids_current = set(position_map[current_node.position])
             id_common = list(ids_current.intersection(id_list))
             if len(id_common) == 1:
-                print('diagonal')
                 id_neigh = id_common[0]
                 # id is a block cannot move diagonally across
                 if obstacles[int(id_neigh)] == 1:
-                    print('invalid obstacle')
                     continue
                 else:
                     node_cost = 1.5
@@ -242,15 +283,14 @@ def astar_search(map, obstacles, start, end, step):
                 neighbor.position[1] - goal_node.position[1])
             neighbor.f = neighbor.g + neighbor.h
             # Check if neighbor is in open list and if it has a lower f value
-            if add_to_open(open, neighbor):
-                # Everything is green, add neighbor to open list
+            if in_open(open, neighbor):
                 open.append(neighbor)
 
     # Return None, no path is found
     return None
 
 
-def add_to_open(open, neighbor):
+def in_open(open, neighbor):
     for node in open:
         if neighbor == node and neighbor.f >= node.f:
             return False
