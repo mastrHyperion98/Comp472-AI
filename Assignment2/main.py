@@ -16,7 +16,8 @@ def split_data(data, year1, year2):
 
 
 def generate_vocabulary(data, column):
-    lower_cased = data[column].str.lower()
+    # strip the string and cast to lower
+    lower_cased = data[column].str.strip().str.lower()
     vocabulary = []
     for statement in lower_cased:
         tokens = statement.split(' ')
@@ -26,13 +27,28 @@ def generate_vocabulary(data, column):
     return np.unique(vocabulary)
 
 
+def generate_frequency_per_type(data, freq_column, column, type):
+    data_type = data[(data[column] == type)]
+    sentences = data[freq_column].str.strip().str.lower()
+    dict = {}
+    for sentence in sentences:
+        tokens = sentence.split(' ')
+        for token in tokens:
+            if token in dict:
+                dict[token] = dict[token] + 1
+            else:
+                dict[token] = 1
+    return pd.DataFrame(dict, columns=['word, frequency'])
+
+
 # main function
 def main():
     data = pd.read_csv('data/hns_2018_2019.csv')
     # Divide our data into two partitions based on year
     data_2018, data_2019 = split_data(data, '2018', '2019')
     vocabulary = pd.DataFrame(generate_vocabulary(data_2018, 'Title'), columns=['word'])
-    print(vocabulary)
+    # use to perform left merge on word
+    generate_frequency_per_type(data_2018,'Title', 'Post Type', 'story')
 
 
 if __name__ == "__main__":
