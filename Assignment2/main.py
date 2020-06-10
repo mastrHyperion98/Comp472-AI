@@ -29,7 +29,7 @@ def generate_vocabulary(data, column):
 
 def generate_frequency_per_type(data, freq_column, column, type):
     data_type = data[(data[column] == type)]
-    sentences = data[freq_column].str.strip().str.lower()
+    sentences = data_type[freq_column].str.strip().str.lower()
     dict = {}
     for sentence in sentences:
         tokens = sentence.split(' ')
@@ -37,9 +37,27 @@ def generate_frequency_per_type(data, freq_column, column, type):
             if token in dict:
                 dict[token] = dict[token] + 1
             else:
-                dict[token] = 1
-    return pd.DataFrame(dict, columns=['word, frequency'])
+                dict[token] = 1 # Increase to 2 for smoothness
+    column_name = type+'_frequency'
+    keys = list(dict.keys())
+    values = list(dict.values())
+    dict = {'word':keys, column_name:values}
+    return pd.DataFrame(dict)
 
+
+def generate_frequency_frame(data, vocabulary):
+    freq_story = generate_frequency_per_type(data, 'Title', 'Post Type', 'story')
+    freq_ask_hn = generate_frequency_per_type(data, 'Title', 'Post Type', 'ask_hn')
+    freq_show_hn = generate_frequency_per_type(data, 'Title', 'Post Type', 'show_hn')
+    freq_poll = generate_frequency_per_type(data, 'Title', 'Post Type', 'poll')
+    vocabulary = pd.merge(vocabulary, freq_story, how='left', on='word')
+    vocabulary = pd.merge(vocabulary, freq_ask_hn, how='left', on='word')
+    vocabulary = pd.merge(vocabulary, freq_show_hn, how='left', on='word')
+    vocabulary = pd.merge(vocabulary, freq_poll, how='left', on='word')
+    # fill NA frequency with 0 // increase to 1 for smoothness
+    vocabulary.fillna(0, inplace=True)
+
+    return vocabulary
 
 # main function
 def main():
@@ -48,8 +66,8 @@ def main():
     data_2018, data_2019 = split_data(data, '2018', '2019')
     vocabulary = pd.DataFrame(generate_vocabulary(data_2018, 'Title'), columns=['word'])
     # use to perform left merge on word
-    generate_frequency_per_type(data_2018,'Title', 'Post Type', 'story')
-
+    vocabulary = generate_frequency_frame(data_2018, vocabulary)
+    print(vocabulary[(vocabulary['show_hn_frequency']) > 0])
 
 if __name__ == "__main__":
     main()
