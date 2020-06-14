@@ -129,7 +129,7 @@ class Naives_Bayes:
 
         length = len(X)
         for type in y:
-            self.prior[type] = len(X[X['Post Type'] == type]) / length
+            self.prior[type] = (len(X[X['Post Type'] == type]) + 1) / length
 
         vocabulary = pd.DataFrame(generate_vocabulary(X, 'Title'), columns=['word'])
         # use to perform left merge on word
@@ -142,12 +142,12 @@ class Naives_Bayes:
 
     def predict(self, test):
         # argmaxcjlog(P(cj)) + Σlog(P(wi|c))
-
-        for documents in test:
+        results = {}
+        for document in test:
             scores = {}
             for target in self.y:
                 p_target = math.log10(self.prior[target])
-                tokens = word_tokenize(documents)
+                tokens = word_tokenize(document)
                 score = p_target
                 for token in tokens:
                     data = self.X
@@ -158,9 +158,8 @@ class Naives_Bayes:
                         sub_frame.reset_index(inplace=True)
                         score = score + math.log10(sub_frame.at[0, 'p(word | {})'.format(target)])
                 scores[target] = score
-
-
-
+            results[document] = scores
+        return results
 
 
 # main function
@@ -168,10 +167,13 @@ def main():
     data = pd.read_csv('data/hns_2018_2019.csv')
     # Divide our data into two partitions based on year
     data_2018, data_2019 = split_data(data, '2018', '2019')
-    list_types = np.unique(['Post Type']).tolist()
+    list_types = np.unique(data_2018['Post Type']).tolist()
     list_types.append('poll')
+    print(list_types)
     NB = Naives_Bayes()
     NB.fit(data_2018, list_types)
+    test_documents = data_2019['Title'].tolist()
+    print(NB.predict(test_documents))
 
 # Executes main function
 if __name__ == "__main__":
