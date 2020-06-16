@@ -21,12 +21,23 @@ def generate_vocabulary(data, column):
     # strip the string and cast to lower
     lower_cased = data[column].str.strip().str.lower()
     vocabulary = []
+    removed = []
+
     for statement in lower_cased:
+        if statement.find('show hn') >= 0:
+            vocabulary.append('show_hn')
+            statement.replace('show hn', '')
+        if statement.find('ask hn') >= 0:
+            vocabulary.append('ask_hn')
+            statement.replace('ask hn', '')
+
         tokens = word_tokenize(statement)
-
         for token in tokens:
-            vocabulary.append(token)
-
+            # only keep alpha numeric or alpha
+            if token.isalpha() or token.isalnum():
+                vocabulary.append(token)
+            else:
+                removed.append(token)
     return np.unique(vocabulary)
 
 
@@ -142,7 +153,8 @@ class Naives_Bayes:
 
     def predict(self, test):
         # argmaxcjlog(P(cj)) + Σlog(P(wi|c))
-        results = {}
+        predictions = []
+        all_scores = {}
         for document in test:
             scores = {}
             for target in self.y:
@@ -158,8 +170,11 @@ class Naives_Bayes:
                         sub_frame.reset_index(inplace=True)
                         score = score + math.log10(sub_frame.at[0, 'p(word | {})'.format(target)])
                 scores[target] = score
-            results[document] = scores
-        return results
+
+            all_scores[document] = scores
+            predict = max(scores, key=scores.get)
+            predictions.append(predict)
+        return all_scores, predictions
 
 
 # main function
@@ -172,8 +187,10 @@ def main():
     print(list_types)
     NB = Naives_Bayes()
     NB.fit(data_2018, list_types)
-    test_documents = data_2019['Title'].tolist()
-    print(NB.predict(test_documents))
+    test_documents = data_2019['Title'].head(10).tolist()
+    scores, predictions = NB.predict(test_documents)
+    print(predictions)
+    print(data_2019.head(10)['Post Type'])
 
 # Executes main function
 if __name__ == "__main__":
