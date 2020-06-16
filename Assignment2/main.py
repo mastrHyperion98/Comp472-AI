@@ -9,6 +9,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from nltk.tokenize import word_tokenize
 import math
+import time
+
 
 # Splits our data around two given years
 def split_data(data, year1, year2):
@@ -26,15 +28,15 @@ def generate_vocabulary(data, column):
     for statement in lower_cased:
         if statement.find('show hn') >= 0:
             vocabulary.append('show_hn')
-            statement.replace('show hn', '')
+            statement = statement.replace('show hn', '')
         if statement.find('ask hn') >= 0:
             vocabulary.append('ask_hn')
-            statement.replace('ask hn', '')
+            statement = statement.replace('ask hn', '')
 
         tokens = word_tokenize(statement)
         for token in tokens:
             # only keep alpha numeric or alpha
-            if token.isalpha() or token.isalnum():
+            if token.isalpha() or token.isalnum() or token == '?' or token == ':' or token == '!':
                 vocabulary.append(token)
             else:
                 removed.append(token)
@@ -46,12 +48,31 @@ def generate_frequency_per_type(data, freq_column, column, type):
     sentences = data_type[freq_column].str.strip().str.lower()
     dict = {}
     for sentence in sentences:
-        tokens = sentence.split(' ')
-        for token in tokens:
+        if sentence.find('show hn') >= 0:
+            token = 'show_hn'
             if token in dict:
                 dict[token] = dict[token] + 1
             else:
                 dict[token] = 1  # Increase to 2 for smoothness
+            sentence = sentence.replace('show hn', '')
+
+        if sentence.find('ask hn') >= 0:
+            token = 'ask_hn'
+            if token in dict:
+                dict[token] = dict[token] + 1
+            else:
+                dict[token] = 1  # Increase to 2 for smoothness
+            sentence = sentence.replace('ask hn', '')
+
+        tokens = word_tokenize(sentence)
+        for token in tokens:
+
+            if token.isalpha() or token.isalnum() or token == '?' or token == ':' or token == '!':
+                if token in dict:
+                    dict[token] = dict[token] + 1
+                else:
+                    dict[token] = 1  # Increase to 2 for smoothness
+
     column_name = type + '_frequency'
     keys = list(dict.keys())
     values = list(dict.values())
@@ -140,7 +161,7 @@ class Naives_Bayes:
 
         length = len(X)
         for type in y:
-            self.prior[type] = (len(X[X['Post Type'] == type]) + 1) / length
+            self.prior[type] = (len(X[X['Post Type'] == type]) + 1) / (length + 1)
 
         vocabulary = pd.DataFrame(generate_vocabulary(X, 'Title'), columns=['word'])
         # use to perform left merge on word
@@ -156,10 +177,29 @@ class Naives_Bayes:
         predictions = []
         all_scores = {}
         for document in test:
+            if 'selenium: storing data efficiently' == document:
+                print("HELLO")
+            document_lower = document.lower()
+            show_hn = False
+            ask_hn = False
+
+            if document_lower.find('show hn') >= 0:
+                document_lower = document.replace('show hn', '')
+                show_hn = True
+            if document_lower.find('ask hn') >= 0:
+                document_lower = document_lower.replace('ask hn', '')
+                ask_hn = True
+
             scores = {}
             for target in self.y:
                 p_target = math.log10(self.prior[target])
-                tokens = word_tokenize(document)
+                # check document for show hn or ask_hn
+                tokens = word_tokenize(document_lower)
+                if show_hn:
+                    tokens.append('show_hn')
+                if ask_hn:
+                    tokens.append('ask_hn')
+
                 score = p_target
                 for token in tokens:
                     data = self.X
@@ -179,18 +219,21 @@ class Naives_Bayes:
 
 # main function
 def main():
+    start_time = time.process_time()
     data = pd.read_csv('data/hns_2018_2019.csv')
     # Divide our data into two partitions based on year
     data_2018, data_2019 = split_data(data, '2018', '2019')
     list_types = np.unique(data_2018['Post Type']).tolist()
     list_types.append('poll')
-    print(list_types)
     NB = Naives_Bayes()
     NB.fit(data_2018, list_types)
-    test_documents = data_2019['Title'].head(10).tolist()
+    test_documents = data_2019['Title'].head(20).tolist()
     scores, predictions = NB.predict(test_documents)
     print(predictions)
-    print(data_2019.head(10)['Post Type'])
+    print(data_2019.head(20)['Post Type'])
+    #print(scores)
+   #print(time.process_time() - start_time)
+
 
 # Executes main function
 if __name__ == "__main__":
