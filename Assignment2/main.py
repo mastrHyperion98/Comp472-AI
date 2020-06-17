@@ -185,11 +185,11 @@ class Naives_Bayes:
             show_hn = False
             ask_hn = False
 
-            if document_lower.find('show hn') >= 0:
+            if 'show hn' in document_lower:
                 document_lower = document.replace('show hn', '')
                 show_hn = True
 
-            if document_lower.find('ask hn') >= 0:
+            if 'ask hn' in document_lower:
                 document_lower = document_lower.replace('ask hn', '')
                 ask_hn = True
 
@@ -206,7 +206,7 @@ class Naives_Bayes:
                 score = p_target
                 for token in tokens:
                     data = self.X
-                    sub_frame = data[(data.word == token)]
+                    sub_frame = data[data.word.isin([token])]
                     if len(sub_frame) == 0:
                         continue
                     else:
@@ -239,7 +239,7 @@ def write_results_to_file(filename, predictions, score, true_values):
 
 # main function
 def main():
-
+    start_time = time.process_time()
     data = pd.read_csv('data/hns_2018_2019.csv')
     # Divide our data into two partitions based on year
     data_2018, data_2019 = split_data(data, '2018', '2019')
@@ -247,11 +247,11 @@ def main():
     list_types.append('poll')
     NB = Naives_Bayes()
     NB.fit(data_2018, list_types)
+
     test_documents = data_2019['Title'].tolist()
-    start_time = time.process_time()
     scores, predictions = NB.predict(test_documents)
     print(time.process_time() - start_time)
-    write_results_to_file('baseline-result.txt', predictions, scores, data_2019['Post Type'].tolist())
+    #write_results_to_file('baseline-result.txt', predictions, scores, data_2019['Post Type'].tolist())
     ## Write results to file
 
 # Executes main function
