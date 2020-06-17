@@ -19,9 +19,9 @@ def split_data(data, year1, year2):
     return data_2018, data_2019
 
 
-def generate_vocabulary(data, column):
+def generate_vocabulary(data):
     # strip the string and cast to lower
-    lower_cased = data[column].str.strip().str.lower()
+    lower_cased = data['Title'].str.strip().str.lower()
     vocabulary = []
     removed = []
 
@@ -40,7 +40,23 @@ def generate_vocabulary(data, column):
                 vocabulary.append(token)
             else:
                 removed.append(token)
-    return np.unique(vocabulary)
+
+    ## Print Vocabulary and removed words
+    filename = 'vocabulary.txt'
+    vocabulary = np.unique(vocabulary)
+    with open(filename, 'w', encoding='utf-8') as file:
+        for word in vocabulary:
+            file.write("%s\n" % word)
+        file.close()
+
+    filename = "remove_word.txt"
+    removed = np.unique(removed)
+    with open(filename, 'w', encoding='utf-8') as file:
+        for word in removed:
+            file.write("%s\n" % word)
+        file.close()
+
+    return vocabulary
 
 
 def generate_frequency_per_type(data, freq_column, column, type):
@@ -97,11 +113,8 @@ def generate_frequency_frame(data, vocabulary):
 
 
 # gets the probability of a given value in a column
-def probability_of(data, value, feature):
-    num_observations = len(data[feature])
-    num_entries = len(data[(data[feature]) == value])
-
-    return float(num_entries / num_observations)
+def probability_of(frequency, total, size, delta):
+    return (frequency + delta) / (total + (delta * size))
 
 
 # get the probability of each word given a post type
@@ -112,18 +125,9 @@ def conditional_probability(vocabulary, list_types, delta):
         probabilities = {}
         total_numbers_of_words_in_c = vocabulary[type + '_frequency'].sum()
         size_vocabulary = len(vocabulary)
-        words = vocabulary['word'].tolist()
-        for word in words:
-            tmp = vocabulary[(vocabulary.word == word)]
-            tmp = tmp[type + '_frequency'].tolist()
-            frequency = tmp.pop()
-            cp = (frequency + delta) / (total_numbers_of_words_in_c + (delta * size_vocabulary))
-            probabilities[word] = cp
-        # we need to merge probabilities into vocabulary
-        keys = list(probabilities.keys())
-        values = list(probabilities.values())
-        dict = pd.DataFrame({'word': keys, 'p(word | {})'.format(type): values})
-        vocabulary = pd.merge(vocabulary, dict, how='left', on='word')
+        vocabulary['p(word | {})'.format(type)] = vocabulary.apply(
+            lambda row: probability_of(frequency=row[type + '_frequency'], total=total_numbers_of_words_in_c,
+                                       size=size_vocabulary, delta=delta), axis=1)
     return vocabulary
 
 
@@ -163,7 +167,7 @@ class Naives_Bayes:
         for type in y:
             self.prior[type] = (len(X[X['Post Type'] == type]) + 1) / (length + 1)
 
-        vocabulary = pd.DataFrame(generate_vocabulary(X, 'Title'), columns=['word'])
+        vocabulary = pd.DataFrame(generate_vocabulary(X), columns=['word'])
         # use to perform left merge on word
         vocabulary = generate_frequency_frame(X, vocabulary)
         vocabulary = conditional_probability(vocabulary, y, 0.5)
@@ -174,11 +178,9 @@ class Naives_Bayes:
 
     def predict(self, test):
         # argmaxcjlog(P(cj)) + Σlog(P(wi|c))
-        predictions = []
+        predictions = {}
         all_scores = {}
         for document in test:
-            if 'selenium: storing data efficiently' == document:
-                print("HELLO")
             document_lower = document.lower()
             show_hn = False
             ask_hn = False
@@ -186,6 +188,7 @@ class Naives_Bayes:
             if document_lower.find('show hn') >= 0:
                 document_lower = document.replace('show hn', '')
                 show_hn = True
+
             if document_lower.find('ask hn') >= 0:
                 document_lower = document_lower.replace('ask hn', '')
                 ask_hn = True
@@ -208,18 +211,35 @@ class Naives_Bayes:
                         continue
                     else:
                         sub_frame.reset_index(inplace=True)
-                        score = score + math.log10(sub_frame.at[0, 'p(word | {})'.format(target)])
+                        score = score + math.log10(sub_frame['p(word | {})'.format(target)].iat[0])
                 scores[target] = score
 
             all_scores[document] = scores
             predict = max(scores, key=scores.get)
-            predictions.append(predict)
+            predictions[document] = predict
         return all_scores, predictions
+
+
+def write_results_to_file(filename, predictions, score, true_values):
+    with open(filename, 'w', encoding='utf8') as file:
+        counter = 1
+        for document in predictions.keys():
+            string = '{}  {}  {}  {}  {}  {}  {}  {}  {}\n'.format(counter, document,
+                                                                  predictions[document],
+                                                                  score[document]['story'],
+                                                                  score[document]['ask_hn'],
+                                                                  score[document]['show_hn'],
+                                                                  score[document]['poll'],
+                                                                  true_values[counter - 1],
+                                                                  true_values[counter - 1] == predictions[document])
+            counter = counter + 1
+            file.write(string)
+        file.close()
 
 
 # main function
 def main():
-    start_time = time.process_time()
+
     data = pd.read_csv('data/hns_2018_2019.csv')
     # Divide our data into two partitions based on year
     data_2018, data_2019 = split_data(data, '2018', '2019')
@@ -227,13 +247,12 @@ def main():
     list_types.append('poll')
     NB = Naives_Bayes()
     NB.fit(data_2018, list_types)
-    test_documents = data_2019['Title'].head(20).tolist()
+    test_documents = data_2019['Title'].tolist()
+    start_time = time.process_time()
     scores, predictions = NB.predict(test_documents)
-    print(predictions)
-    print(data_2019.head(20)['Post Type'])
-    #print(scores)
-   #print(time.process_time() - start_time)
-
+    print(time.process_time() - start_time)
+    write_results_to_file('baseline-result.txt', predictions, scores, data_2019['Post Type'].tolist())
+    ## Write results to file
 
 # Executes main function
 if __name__ == "__main__":
