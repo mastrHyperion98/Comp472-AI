@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from nltk.tokenize import word_tokenize
+from sklearn.metrics import accuracy_score
 import math
 import time
 
@@ -158,18 +159,22 @@ class Naives_Bayes:
     def __init__(self):
         self.X = None
         self.y = None
+        self.vocab = None
         self.prior = None
 
     def fit(self, X, y, prior):
-        self.X = X
+        X.set_index("word", drop=True, inplace=True)
+        self.X = X.to_dict(orient="index")
         self.y = y
         self.prior = prior
 
     def predict(self, test):
         # argmaxcjlog(P(cj)) + Σlog(P(wi|c))
-        predictions = {}
-        all_scores = {}
+        predictions = []
+        all_scores = []
+        counter = 0
         for document in test:
+            counter = counter + 1
             document_lower = document.lower()
             show_hn = False
             ask_hn = False
@@ -194,33 +199,28 @@ class Naives_Bayes:
                 score = p_target
                 for token in tokens:
                     data = self.X
-                    sub_frame = data[data.word.isin([token])]
-                    if len(sub_frame) == 0:
-                        continue
-                    else:
-                        # score = score + math.log10(sub_frame['p(word | {})'.format(target)].iat[0])
-                        compute = lambda x, i=scores: i[x] + math.log10(sub_frame['p(word | {})'.format(x)].iat[0])
-                        map
+                    if token in data:
+                        value = math.log10(data[token]['p(word | {})'.format(target)])
+                        score = score + value
                 scores[target] = score
-
-            all_scores[document] = scores
+            all_scores.append(scores)
             predict = max(scores, key=scores.get)
-            predictions[document] = predict
+            predictions.append(predict)
         return all_scores, predictions
 
 
-def write_results_to_file(filename, predictions, score, true_values):
+def write_results_to_file(filename, predictions, score, documents, true_values):
     with open(filename, 'w', encoding='utf8') as file:
         counter = 1
-        for document in predictions.keys():
-            string = '{}  {}  {}  {}  {}  {}  {}  {}  {}\n'.format(counter, document,
-                                                                   predictions[document],
-                                                                   score[document]['story'],
-                                                                   score[document]['ask_hn'],
-                                                                   score[document]['show_hn'],
-                                                                   score[document]['poll'],
+        for i in range(len(documents)):
+            string = '{}  {}  {}  {}  {}  {}  {}  {}  {}\n'.format(counter, documents[i],
+                                                                   predictions[i],
+                                                                   score[i]['story'],
+                                                                   score[i]['ask_hn'],
+                                                                   score[i]['show_hn'],
+                                                                   score[i]['poll'],
                                                                    true_values[counter - 1],
-                                                                   true_values[counter - 1] == predictions[document])
+                                                                   true_values[counter - 1] == predictions[i])
             counter = counter + 1
             file.write(string)
         file.close()
@@ -244,8 +244,10 @@ def task_1_and_2(data_2018, list_types, data_2019):
     print('PREDICTING TEST RESULT')
     scores, predictions = NB.predict(test_documents)
     print('WRITING RESULTS TO FILE ...')
-    write_results_to_file('baseline-result.txt', predictions, scores, data_2019['Post Type'].tolist())
+    write_results_to_file('baseline-result.txt', predictions, scores, data_2019.Title.tolist(), data_2019['Post Type'].tolist())
     print('WRITING RESULTS TO FILE COMPLETED')
+    print('Accuracy Score on test data: ', accuracy_score(y_true=data_2019['Post Type'].tolist(),
+                                                          y_pred=predictions))
 
 
 def task3(data_2018, list_types, data_2019):
@@ -268,8 +270,8 @@ def main():
     list_types = np.unique(data_2018['Post Type']).tolist()
     list_types.append('poll')
 
-    #task_1_and_2(data_2018, list_types, data_2019)
-    task3(data_2018, list_types, data_2019)
+    task_1_and_2(data_2018, list_types, data_2019)
+    # task3(data_2018, list_types, data_2019)
     print(time.process_time() - start_time)
 
 
