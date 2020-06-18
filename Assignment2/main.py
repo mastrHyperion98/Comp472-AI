@@ -20,7 +20,7 @@ def split_data(data, year1, year2):
     return data_2018, data_2019
 
 
-def generate_vocabulary(data, stop_words=[], min = 1, max = 10000):
+def generate_vocabulary(data, stop_words=[], min_len=1, max_len=10000):
     # strip the string and cast to lower
     lower_cased = data['Title'].str.strip().str.lower()
     vocabulary = []
@@ -37,7 +37,8 @@ def generate_vocabulary(data, stop_words=[], min = 1, max = 10000):
         tokens = word_tokenize(statement)
         for token in tokens:
             # only keep alpha numeric or alpha
-            if min <= len(token) <= max and (token.isalpha() or token.isalnum() or token == '?' or token == ':' or token == '!') and token not in stop_words:
+            if min_len <= len(token) <= max_len and (
+                    token.isalpha() or token.isalnum() or token == '?' or token == ':' or token == '!') and token not in stop_words:
                 vocabulary.append(token)
             else:
                 removed.append(token)
@@ -244,7 +245,8 @@ def task_1_and_2(data_2018, list_types, data_2019, prior):
     print('PREDICTING TEST RESULT')
     scores, predictions = NB.predict(test_documents)
     print('WRITING RESULTS TO FILE ...')
-    write_results_to_file('baseline-result.txt', predictions, scores, data_2019.Title.tolist(), data_2019['Post Type'].tolist())
+    write_results_to_file('baseline-result.txt', predictions, scores, data_2019.Title.tolist(),
+                          data_2019['Post Type'].tolist())
     print('WRITING RESULTS TO FILE COMPLETED')
     print('Accuracy Score on test data: ', accuracy_score(y_true=data_2019['Post Type'].tolist(),
                                                           y_pred=predictions))
@@ -276,7 +278,7 @@ def exp1(data_2018, list_types, data_2019, prior):
                           data_2019['Post Type'].tolist())
     print('WRITING RESULTS TO FILE COMPLETED')
     print('Experiment 1 Accuracy Score on test data: ', accuracy_score(y_true=data_2019['Post Type'].tolist(),
-                                                          y_pred=predictions))
+                                                                       y_pred=predictions))
 
 
 def exp2(data_2018, list_types, data_2019, prior):
@@ -288,7 +290,7 @@ def exp2(data_2018, list_types, data_2019, prior):
         for line in Lines:
             stop_words.append(line.strip())
 
-    words, removed_words = generate_vocabulary(data_2018, min=3, max=8)
+    words, removed_words = generate_vocabulary(data_2018, min_len=3, max_len=8)
     vocabulary = pd.DataFrame(words, columns=['word'])
     # use to perform left merge on word
     vocabulary = generate_frequency_frame(data_2018, vocabulary)
@@ -304,7 +306,7 @@ def exp2(data_2018, list_types, data_2019, prior):
     write_results_to_file('wordlength-result.txt', predictions, scores, data_2019.Title.tolist(),
                           data_2019['Post Type'].tolist())
     print('WRITING RESULTS TO FILE COMPLETED')
-    print('Experiment 1 Accuracy Score on test data: ', accuracy_score(y_true=data_2019['Post Type'].tolist(),
+    print('Experiment 2 Accuracy Score on test data: ', accuracy_score(y_true=data_2019['Post Type'].tolist(),
                                                                        y_pred=predictions))
 
 
