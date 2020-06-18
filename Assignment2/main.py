@@ -20,7 +20,7 @@ def split_data(data, year1, year2):
     return data_2018, data_2019
 
 
-def generate_vocabulary(data, stop_words=[]):
+def generate_vocabulary(data, stop_words=[], min = 1, max = 10000):
     # strip the string and cast to lower
     lower_cased = data['Title'].str.strip().str.lower()
     vocabulary = []
@@ -37,7 +37,7 @@ def generate_vocabulary(data, stop_words=[]):
         tokens = word_tokenize(statement)
         for token in tokens:
             # only keep alpha numeric or alpha
-            if (token.isalpha() or token.isalnum() or token == '?' or token == ':' or token == '!') and token not in stop_words:
+            if min <= len(token) <= max and (token.isalpha() or token.isalnum() or token == '?' or token == ':' or token == '!') and token not in stop_words:
                 vocabulary.append(token)
             else:
                 removed.append(token)
@@ -250,7 +250,7 @@ def task_1_and_2(data_2018, list_types, data_2019, prior):
                                                           y_pred=predictions))
 
 
-def task3(data_2018, list_types, data_2019, prior):
+def exp1(data_2018, list_types, data_2019, prior):
     print('\n****EXPERIMENT 1*****\n')
     stop_words = []
 
@@ -279,6 +279,35 @@ def task3(data_2018, list_types, data_2019, prior):
                                                           y_pred=predictions))
 
 
+def exp2(data_2018, list_types, data_2019, prior):
+    print('\n****EXPERIMENT 2*****\n')
+    stop_words = []
+
+    with open('data/stopwords.txt', 'r') as file:
+        Lines = file.readlines()
+        for line in Lines:
+            stop_words.append(line.strip())
+
+    words, removed_words = generate_vocabulary(data_2018, min=3, max=8)
+    vocabulary = pd.DataFrame(words, columns=['word'])
+    # use to perform left merge on word
+    vocabulary = generate_frequency_frame(data_2018, vocabulary)
+    vocabulary = conditional_probability(vocabulary, list_types, 0.5)
+    vocabulary = vocabulary.sort_values(by=['word'])
+    vocabulary_to_file('wordlength-model.txt', vocabulary)
+    NB = Naives_Bayes()
+    NB.fit(vocabulary, list_types, prior)
+    test_documents = data_2019['Title'].tolist()
+    print('PREDICTING TEST RESULT')
+    scores, predictions = NB.predict(test_documents)
+    print('WRITING RESULTS TO FILE ...')
+    write_results_to_file('wordlength-result.txt', predictions, scores, data_2019.Title.tolist(),
+                          data_2019['Post Type'].tolist())
+    print('WRITING RESULTS TO FILE COMPLETED')
+    print('Experiment 1 Accuracy Score on test data: ', accuracy_score(y_true=data_2019['Post Type'].tolist(),
+                                                                       y_pred=predictions))
+
+
 # main function
 def main():
     start_time = time.process_time()
@@ -293,7 +322,8 @@ def main():
         prior[type] = (len(data_2018[data_2018['Post Type'] == type]) + 1) / (length + 1)
 
     task_1_and_2(data_2018, list_types, data_2019, prior)
-    task3(data_2018, list_types, data_2019, prior)
+    exp1(data_2018, list_types, data_2019, prior)
+    exp2(data_2018, list_types, data_2019, prior)
     print(time.process_time() - start_time)
 
 
