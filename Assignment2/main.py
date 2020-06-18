@@ -20,7 +20,7 @@ def split_data(data, year1, year2):
     return data_2018, data_2019
 
 
-def generate_vocabulary(data):
+def generate_vocabulary(data, stop_words=[]):
     # strip the string and cast to lower
     lower_cased = data['Title'].str.strip().str.lower()
     vocabulary = []
@@ -37,14 +37,18 @@ def generate_vocabulary(data):
         tokens = word_tokenize(statement)
         for token in tokens:
             # only keep alpha numeric or alpha
-            if token.isalpha() or token.isalnum() or token == '?' or token == ':' or token == '!':
+            if (token.isalpha() or token.isalnum() or token == '?' or token == ':' or token == '!') and token not in stop_words:
                 vocabulary.append(token)
             else:
                 removed.append(token)
 
+    vocabulary = np.unique(vocabulary)
+    return vocabulary, removed
+
+
+def write_generated_vocab_and_removed(vocabulary, removed):
     ## Print Vocabulary and removed words
     filename = 'vocabulary.txt'
-    vocabulary = np.unique(vocabulary)
     with open(filename, 'w', encoding='utf-8') as file:
         for word in vocabulary:
             file.write("%s\n" % word)
@@ -56,8 +60,6 @@ def generate_vocabulary(data):
         for word in removed:
             file.write("%s\n" % word)
         file.close()
-
-    return vocabulary
 
 
 def generate_frequency_per_type(data, freq_column, column, type):
@@ -226,13 +228,11 @@ def write_results_to_file(filename, predictions, score, documents, true_values):
         file.close()
 
 
-def task_1_and_2(data_2018, list_types, data_2019):
-    prior = {}
-    length = len(data_2018)
-    for type in list_types:
-        prior[type] = (len(data_2018[data_2018['Post Type'] == type]) + 1) / (length + 1)
-
-    vocabulary = pd.DataFrame(generate_vocabulary(data_2018), columns=['word'])
+def task_1_and_2(data_2018, list_types, data_2019, prior):
+    print('****TASK 1 and 2****\n')
+    words, removed_words = generate_vocabulary(data_2018)
+    write_generated_vocab_and_removed(words, removed_words)
+    vocabulary = pd.DataFrame(words, columns=['word'])
     # use to perform left merge on word
     vocabulary = generate_frequency_frame(data_2018, vocabulary)
     vocabulary = conditional_probability(vocabulary, list_types, 0.5)
@@ -250,7 +250,8 @@ def task_1_and_2(data_2018, list_types, data_2019):
                                                           y_pred=predictions))
 
 
-def task3(data_2018, list_types, data_2019):
+def task3(data_2018, list_types, data_2019, prior):
+    print('\n****EXPERIMENT 1*****\n')
     stop_words = []
 
     with open('data/stopwords.txt', 'r') as file:
@@ -258,7 +259,24 @@ def task3(data_2018, list_types, data_2019):
         for line in Lines:
             stop_words.append(line.strip())
 
-    print(stop_words)
+    words, removed_words = generate_vocabulary(data_2018, stop_words=stop_words)
+    vocabulary = pd.DataFrame(words, columns=['word'])
+    # use to perform left merge on word
+    vocabulary = generate_frequency_frame(data_2018, vocabulary)
+    vocabulary = conditional_probability(vocabulary, list_types, 0.5)
+    vocabulary = vocabulary.sort_values(by=['word'])
+    vocabulary_to_file('stopword-model.txt', vocabulary)
+    NB = Naives_Bayes()
+    NB.fit(vocabulary, list_types, prior)
+    test_documents = data_2019['Title'].tolist()
+    print('PREDICTING TEST RESULT')
+    scores, predictions = NB.predict(test_documents)
+    print('WRITING RESULTS TO FILE ...')
+    write_results_to_file('stopword-result.txt', predictions, scores, data_2019.Title.tolist(),
+                          data_2019['Post Type'].tolist())
+    print('WRITING RESULTS TO FILE COMPLETED')
+    print('Experiment 1 Accuracy Score on test data: ', accuracy_score(y_true=data_2019['Post Type'].tolist(),
+                                                          y_pred=predictions))
 
 
 # main function
@@ -269,9 +287,13 @@ def main():
     data_2018, data_2019 = split_data(data, '2018', '2019')
     list_types = np.unique(data_2018['Post Type']).tolist()
     list_types.append('poll')
+    prior = {}
+    length = len(data_2018)
+    for type in list_types:
+        prior[type] = (len(data_2018[data_2018['Post Type'] == type]) + 1) / (length + 1)
 
-    task_1_and_2(data_2018, list_types, data_2019)
-    # task3(data_2018, list_types, data_2019)
+    task_1_and_2(data_2018, list_types, data_2019, prior)
+    task3(data_2018, list_types, data_2019, prior)
     print(time.process_time() - start_time)
 
 
