@@ -131,9 +131,8 @@ def conditional_probability(vocabulary, list_types, delta):
     return vocabulary
 
 
-def vocabulary_to_file(vocabulary):
+def vocabulary_to_file(filename, vocabulary):
     print('WRITING VOCABULARY TO FILE...')
-    filename = 'model-2018.txt'
     file = open(filename, 'w', encoding='utf-8')
     to_write = ''
     for i in range(len(vocabulary)):
@@ -159,22 +158,12 @@ class Naives_Bayes:
     def __init__(self):
         self.X = None
         self.y = None
-        self.prior = {}
+        self.prior = None
 
-    def fit(self, X, y):
-
-        length = len(X)
-        for type in y:
-            self.prior[type] = (len(X[X['Post Type'] == type]) + 1) / (length + 1)
-
-        vocabulary = pd.DataFrame(generate_vocabulary(X), columns=['word'])
-        # use to perform left merge on word
-        vocabulary = generate_frequency_frame(X, vocabulary)
-        vocabulary = conditional_probability(vocabulary, y, 0.5)
-        vocabulary = vocabulary.sort_values(by=['word'])
-        vocabulary_to_file(vocabulary)
-        self.X = vocabulary
+    def fit(self, X, y, prior):
+        self.X = X
         self.y = y
+        self.prior = prior
 
     def predict(self, test):
         # argmaxcjlog(P(cj)) + Σlog(P(wi|c))
@@ -193,16 +182,15 @@ class Naives_Bayes:
                 document_lower = document_lower.replace('ask hn', '')
                 ask_hn = True
 
+            tokens = word_tokenize(document_lower)
+            if show_hn:
+                tokens.append('show_hn')
+            if ask_hn:
+                tokens.append('ask_hn')
             scores = {}
             for target in self.y:
                 p_target = math.log10(self.prior[target])
                 # check document for show hn or ask_hn
-                tokens = word_tokenize(document_lower)
-                if show_hn:
-                    tokens.append('show_hn')
-                if ask_hn:
-                    tokens.append('ask_hn')
-
                 score = p_target
                 for token in tokens:
                     data = self.X
@@ -210,8 +198,9 @@ class Naives_Bayes:
                     if len(sub_frame) == 0:
                         continue
                     else:
-                        sub_frame.reset_index(inplace=True)
-                        score = score + math.log10(sub_frame['p(word | {})'.format(target)].iat[0])
+                        # score = score + math.log10(sub_frame['p(word | {})'.format(target)].iat[0])
+                        compute = lambda x, i=scores: i[x] + math.log10(sub_frame['p(word | {})'.format(x)].iat[0])
+                        map
                 scores[target] = score
 
             all_scores[document] = scores
@@ -225,16 +214,49 @@ def write_results_to_file(filename, predictions, score, true_values):
         counter = 1
         for document in predictions.keys():
             string = '{}  {}  {}  {}  {}  {}  {}  {}  {}\n'.format(counter, document,
-                                                                  predictions[document],
-                                                                  score[document]['story'],
-                                                                  score[document]['ask_hn'],
-                                                                  score[document]['show_hn'],
-                                                                  score[document]['poll'],
-                                                                  true_values[counter - 1],
-                                                                  true_values[counter - 1] == predictions[document])
+                                                                   predictions[document],
+                                                                   score[document]['story'],
+                                                                   score[document]['ask_hn'],
+                                                                   score[document]['show_hn'],
+                                                                   score[document]['poll'],
+                                                                   true_values[counter - 1],
+                                                                   true_values[counter - 1] == predictions[document])
             counter = counter + 1
             file.write(string)
         file.close()
+
+
+def task_1_and_2(data_2018, list_types, data_2019):
+    prior = {}
+    length = len(data_2018)
+    for type in list_types:
+        prior[type] = (len(data_2018[data_2018['Post Type'] == type]) + 1) / (length + 1)
+
+    vocabulary = pd.DataFrame(generate_vocabulary(data_2018), columns=['word'])
+    # use to perform left merge on word
+    vocabulary = generate_frequency_frame(data_2018, vocabulary)
+    vocabulary = conditional_probability(vocabulary, list_types, 0.5)
+    vocabulary = vocabulary.sort_values(by=['word'])
+    vocabulary_to_file('model-2018.txt', vocabulary)
+    NB = Naives_Bayes()
+    NB.fit(vocabulary, list_types, prior)
+    test_documents = data_2019['Title'].tolist()
+    print('PREDICTING TEST RESULT')
+    scores, predictions = NB.predict(test_documents)
+    print('WRITING RESULTS TO FILE ...')
+    write_results_to_file('baseline-result.txt', predictions, scores, data_2019['Post Type'].tolist())
+    print('WRITING RESULTS TO FILE COMPLETED')
+
+
+def task3(data_2018, list_types, data_2019):
+    stop_words = []
+
+    with open('data/stopwords.txt', 'r') as file:
+        Lines = file.readlines()
+        for line in Lines:
+            stop_words.append(line.strip())
+
+    print(stop_words)
 
 
 # main function
@@ -245,14 +267,11 @@ def main():
     data_2018, data_2019 = split_data(data, '2018', '2019')
     list_types = np.unique(data_2018['Post Type']).tolist()
     list_types.append('poll')
-    NB = Naives_Bayes()
-    NB.fit(data_2018, list_types)
 
-    test_documents = data_2019['Title'].tolist()
-    scores, predictions = NB.predict(test_documents)
+    #task_1_and_2(data_2018, list_types, data_2019)
+    task3(data_2018, list_types, data_2019)
     print(time.process_time() - start_time)
-    #write_results_to_file('baseline-result.txt', predictions, scores, data_2019['Post Type'].tolist())
-    ## Write results to file
+
 
 # Executes main function
 if __name__ == "__main__":
