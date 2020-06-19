@@ -27,12 +27,14 @@ def generate_vocabulary(data, stop_words=[], min_len=1, max_len=10000):
     removed = []
 
     for statement in lower_cased:
-        if statement.find('show hn') >= 0:
+        if "show hn" in statement or "show_hn" in statement:
             vocabulary.append('show_hn')
             statement = statement.replace('show hn', '')
-        if statement.find('ask hn') >= 0:
+            statement = statement.replace('show_hn', '')
+        if "ask hn" in statement or "ask_hn" in statement:
             vocabulary.append('ask_hn')
             statement = statement.replace('ask hn', '')
+            statement = statement.replace('ask_hn', '')
 
         tokens = word_tokenize(statement)
         for token in tokens:
@@ -68,21 +70,23 @@ def generate_frequency_per_type(data, freq_column, column, type):
     sentences = data_type[freq_column].str.strip().str.lower()
     dict = {}
     for sentence in sentences:
-        if sentence.find('show hn') >= 0:
+        if "show hn" in sentence or "show_hn" in sentence:
             token = 'show_hn'
             if token in dict:
                 dict[token] = dict[token] + 1
             else:
                 dict[token] = 1  # Increase to 2 for smoothness
             sentence = sentence.replace('show hn', '')
+            sentence = sentence.replace('show_hn', '')
 
-        if sentence.find('ask hn') >= 0:
+        if "ask hn" in sentence or "ask_hn" in sentence:
             token = 'ask_hn'
             if token in dict:
                 dict[token] = dict[token] + 1
             else:
                 dict[token] = 1  # Increase to 2 for smoothness
             sentence = sentence.replace('ask hn', '')
+            sentence = sentence.replace('ask_hn', '')
 
         tokens = word_tokenize(sentence)
         for token in tokens:
@@ -100,6 +104,10 @@ def generate_frequency_per_type(data, freq_column, column, type):
     return pd.DataFrame(dictionary)
 
 
+def frequency_sum(a,b,c,d):
+    return a+b+c+d
+
+
 def generate_frequency_frame(data, vocabulary):
     print('COMPUTING FREQUENCY...')
     freq_story = generate_frequency_per_type(data, 'Title', 'Post Type', 'story')
@@ -110,9 +118,11 @@ def generate_frequency_frame(data, vocabulary):
     vocabulary = pd.merge(vocabulary, freq_ask_hn, how='left', on='word')
     vocabulary = pd.merge(vocabulary, freq_show_hn, how='left', on='word')
     vocabulary = pd.merge(vocabulary, freq_poll, how='left', on='word')
-    # fill NA frequency with 0 // increase to 1 for smoothness
     vocabulary.fillna(0, inplace=True)
-
+    # Store word frequency
+    vocabulary['frequency'] = vocabulary.apply(
+        lambda row: frequency_sum(row['story_frequency'],row['show_hn_frequency'],row['ask_hn_frequency'],row['poll_frequency']), axis=1)
+    # fill NA frequency with 0 // increase to 1 for smoothness
     return vocabulary
 
 
@@ -182,12 +192,14 @@ class Naives_Bayes:
             show_hn = False
             ask_hn = False
 
-            if 'show hn' in document_lower:
+            if 'show hn' in document_lower or 'show_hn' in document_lower:
                 document_lower = document.replace('show hn', '')
+                document_lower = document.replace('show_hn', '')
                 show_hn = True
 
-            if 'ask hn' in document_lower:
+            if 'ask hn' in document_lower or 'ask_hn' in document_lower:
                 document_lower = document_lower.replace('ask hn', '')
+                document_lower = document_lower.replace('ask_hn', '')
                 ask_hn = True
 
             tokens = word_tokenize(document_lower)
@@ -309,6 +321,73 @@ def exp2(data_2018, list_types, data_2019, prior):
     print('Experiment 2 Accuracy Score on test data: ', accuracy_score(y_true=data_2019['Post Type'].tolist(),
                                                                        y_pred=predictions))
 
+def exp3(data_2018, list_types, data_2019, prior):
+    print('\n****EXPERIMENT 3****\n')
+    words, removed_words = generate_vocabulary(data_2018)
+    write_generated_vocab_and_removed(words, removed_words)
+    vocabulary = pd.DataFrame(words, columns=['word'])
+    # use to perform left merge on word
+    vocabulary = generate_frequency_frame(data_2018, vocabulary)
+    vocabulary = conditional_probability(vocabulary, list_types, 0.5)
+    vocabulary = vocabulary.sort_values(by=['word'])
+    vocabulary_to_file('model-2018.txt', vocabulary)
+    NB = Naives_Bayes()
+
+    test_documents = data_2019['Title'].tolist()
+
+    print("PERFORMING PART 1: LOWEST FREQUENCY")
+    # Perform part 1
+    y = []
+    x = []
+
+    for i in range(5):
+        threshold = i*5
+        if threshold == 0:
+            threshold = 1
+        dataset = vocabulary[(vocabulary.frequency > threshold)]
+        columns = ['p(word | story)', 'p(word | ask_hn)', 'p(word | show_hn)', 'p(word | poll)']
+        dataset = dataset.drop(columns, axis=1).copy()
+        dataset = conditional_probability(dataset, list_types, 0.5)
+        x.append(len(dataset))
+        NB.fit(dataset, list_types, prior)
+        scores, predictions = NB.predict(test_documents)
+        y.append(accuracy_score(y_true=data_2019['Post Type'].tolist(),
+                                                          y_pred=predictions))
+
+    print("DRAWING FIGURE 1")
+    fig, ax = plt.subplots()
+    ax.plot(x,y)
+    ax.set_title('Figure 1: Classifier Performance by Removing Least Common Words')
+    ax.set_xlabel('Vocabulary Size')
+    ax.set_ylabel('Model Accuracy')
+    plt.show()
+
+    # Then gradually remove the top 5% most frequent words,
+    # the 10% most frequent words, 15%, 20% and 25% most frequent words.
+
+    y = []
+    x = []
+    for i in range(5):
+        threshold = ((i * 5) + 5)/100
+        dataset = vocabulary[(vocabulary.frequency < vocabulary.frequency.quantile(1-threshold))]
+        # recompute probabilities
+        columns = ['p(word | story)','p(word | ask_hn)','p(word | show_hn)','p(word | poll)']
+        dataset = dataset.drop(columns, axis=1).copy()
+        dataset = conditional_probability(dataset, list_types, 0.5)
+        x.append(len(dataset))
+        NB.fit(dataset, list_types, prior)
+        scores, predictions = NB.predict(test_documents)
+        y.append(accuracy_score(y_true=data_2019['Post Type'].tolist(),
+                                y_pred=predictions))
+
+    print("DRAWING FIGURE 2")
+    fig, ax = plt.subplots()
+    ax.plot(x, y)
+    ax.set_title('Figure 2: Classifier Performance by Removing Most Common Words')
+    ax.set_xlabel('Vocabulary Size')
+    ax.set_ylabel('Model Accuracy')
+    plt.show()
+
 
 # main function
 def main():
@@ -326,6 +405,7 @@ def main():
     task_1_and_2(data_2018, list_types, data_2019, prior)
     exp1(data_2018, list_types, data_2019, prior)
     exp2(data_2018, list_types, data_2019, prior)
+    exp3(data_2018, list_types, data_2019, prior)
     print(time.process_time() - start_time)
 
 
