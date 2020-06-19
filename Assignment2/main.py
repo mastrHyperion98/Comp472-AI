@@ -1,7 +1,7 @@
 # -------------------------------------------------------
 # Assignment 2
 # Written by Steven Smith 40057065
-# For COMP 472 Section -  – Summer 2020
+# For COMP 472 Section KX - Summer 2020
 # --------------------------------------------------------
 # Import required libraries
 import numpy as np
@@ -10,8 +10,6 @@ import matplotlib.pyplot as plt
 from nltk.tokenize import word_tokenize
 from sklearn.metrics import accuracy_score
 import math
-import time
-
 
 # Splits our data around two given years
 def split_data(data, year1, year2):
@@ -20,14 +18,18 @@ def split_data(data, year1, year2):
     return data_2018, data_2019
 
 
+#  Generates our vocabulary based on a given dataframe, words length limits and banned words
 def generate_vocabulary(data, stop_words=[], min_len=1, max_len=10000):
     # strip the string and cast to lower
+    # a pandas Series stripped of white spaces and casted to lower case
     lower_cased = data['Title'].str.strip().str.lower()
     vocabulary = []
     removed = []
 
     for statement in lower_cased:
+        # check for the presence of show hn or show_hn
         if "show hn" in statement or "show_hn" in statement:
+            # add it to the vocabulary
             vocabulary.append('show_hn')
             statement = statement.replace('show hn', '')
             statement = statement.replace('show_hn', '')
@@ -36,9 +38,10 @@ def generate_vocabulary(data, stop_words=[], min_len=1, max_len=10000):
             statement = statement.replace('ask hn', '')
             statement = statement.replace('ask_hn', '')
 
+        # using nltk to tokenize words
         tokens = word_tokenize(statement)
         for token in tokens:
-            # only keep alpha numeric or alpha
+            # Filter conditions
             if min_len <= len(token) <= max_len and (
                     token.isalpha() or token.isalnum() or token == '?' or token == ':' or token == '!') and token not in stop_words:
                 vocabulary.append(token)
@@ -49,6 +52,7 @@ def generate_vocabulary(data, stop_words=[], min_len=1, max_len=10000):
     return vocabulary, removed
 
 
+# Write vocabulary and removed words list to files
 def write_generated_vocab_and_removed(vocabulary, removed):
     ## Print Vocabulary and removed words
     filename = 'vocabulary.txt'
@@ -63,7 +67,6 @@ def write_generated_vocab_and_removed(vocabulary, removed):
         for word in removed:
             file.write("%s\n" % word)
         file.close()
-
 
 def generate_frequency_per_type(data, freq_column, column, type):
     data_type = data[(data[column] == type)]
@@ -104,16 +107,19 @@ def generate_frequency_per_type(data, freq_column, column, type):
     return pd.DataFrame(dictionary)
 
 
+# Sum of frequencies a,b,c,d
 def frequency_sum(a,b,c,d):
     return a+b+c+d
 
 
 def generate_frequency_frame(data, vocabulary):
     print('COMPUTING FREQUENCY...')
+    # Get a Series for generating the frequency of each word given a type
     freq_story = generate_frequency_per_type(data, 'Title', 'Post Type', 'story')
     freq_ask_hn = generate_frequency_per_type(data, 'Title', 'Post Type', 'ask_hn')
     freq_show_hn = generate_frequency_per_type(data, 'Title', 'Post Type', 'show_hn')
     freq_poll = generate_frequency_per_type(data, 'Title', 'Post Type', 'poll')
+    # Merge the series into the vocabulary dataframe
     vocabulary = pd.merge(vocabulary, freq_story, how='left', on='word')
     vocabulary = pd.merge(vocabulary, freq_ask_hn, how='left', on='word')
     vocabulary = pd.merge(vocabulary, freq_show_hn, how='left', on='word')
@@ -168,6 +174,8 @@ def vocabulary_to_file(filename, vocabulary):
     print('WRITING COMPLETE!')
 
 
+# Custom Class created to fit data and predict results. It is custom made
+# To apply solely for this problem.
 class Naives_Bayes:
     def __init__(self):
         self.X = None
@@ -176,6 +184,7 @@ class Naives_Bayes:
         self.prior = None
 
     def fit(self, X, y, prior):
+        # convert to dictionary with word as index
         X.set_index("word", drop=True, inplace=True)
         self.X = X.to_dict(orient="index")
         self.y = y
@@ -185,9 +194,7 @@ class Naives_Bayes:
         # argmaxcjlog(P(cj)) + Σlog(P(wi|c))
         predictions = []
         all_scores = []
-        counter = 0
         for document in test:
-            counter = counter + 1
             document_lower = document.lower()
             show_hn = False
             ask_hn = False
@@ -215,8 +222,11 @@ class Naives_Bayes:
                 for token in tokens:
                     data = self.X
                     if token in data:
+                        # compute the contribution of the given conditional probability
                         value = math.log10(data[token]['p(word | {})'.format(target)])
+                        # add to the score
                         score = score + value
+
                 scores[target] = score
             all_scores.append(scores)
             predict = max(scores, key=scores.get)
@@ -347,6 +357,7 @@ def exp3(data_2018, list_types, data_2019, prior):
         dataset = vocabulary[(vocabulary.frequency > threshold)]
         columns = ['p(word | story)', 'p(word | ask_hn)', 'p(word | show_hn)', 'p(word | poll)']
         dataset = dataset.drop(columns, axis=1).copy()
+        # recompute the conditioanl probabilities since we droped some data based on frequency.
         dataset = conditional_probability(dataset, list_types, 0.5)
         x.append(len(dataset))
         NB.fit(dataset, list_types, prior)
@@ -368,11 +379,13 @@ def exp3(data_2018, list_types, data_2019, prior):
     y = []
     x = []
     for i in range(5):
-        threshold = ((i * 5) + 5)/100
-        dataset = vocabulary[(vocabulary.frequency < vocabulary.frequency.quantile(1-threshold))]
+        threshold = ((i * 5) + 5)
+        cut = math.ceil((len(vocabulary)/100) * threshold)
+        dataset = vocabulary.sort_values(by='frequency', ascending=False)[cut:]
         # recompute probabilities
         columns = ['p(word | story)','p(word | ask_hn)','p(word | show_hn)','p(word | poll)']
         dataset = dataset.drop(columns, axis=1).copy()
+        # recompute the conditioanl probabilities since we droped some data based on frequency.
         dataset = conditional_probability(dataset, list_types, 0.5)
         x.append(len(dataset))
         NB.fit(dataset, list_types, prior)
@@ -380,6 +393,7 @@ def exp3(data_2018, list_types, data_2019, prior):
         y.append(accuracy_score(y_true=data_2019['Post Type'].tolist(),
                                 y_pred=predictions))
 
+    # Matplotlib stuff to plot the graphs
     print("DRAWING FIGURE 2")
     fig, ax = plt.subplots()
     ax.plot(x, y)
@@ -391,7 +405,6 @@ def exp3(data_2018, list_types, data_2019, prior):
 
 # main function
 def main():
-    start_time = time.process_time()
     data = pd.read_csv('data/hns_2018_2019.csv')
     # Divide our data into two partitions based on year
     data_2018, data_2019 = split_data(data, '2018', '2019')
@@ -399,14 +412,15 @@ def main():
     list_types.append('poll')
     prior = {}
     length = len(data_2018)
+    # compute prior probability of each type
     for type in list_types:
         prior[type] = (len(data_2018[data_2018['Post Type'] == type]) + 1) / (length + 1)
 
+    # Perform and execute each task
     task_1_and_2(data_2018, list_types, data_2019, prior)
     exp1(data_2018, list_types, data_2019, prior)
     exp2(data_2018, list_types, data_2019, prior)
     exp3(data_2018, list_types, data_2019, prior)
-    print(time.process_time() - start_time)
 
 
 # Executes main function
